@@ -87,77 +87,104 @@ class Attack(object):
         if not self.mh_hit:
             self.oh_atk()
 
-if __name__ == "__main__":
-    n_trials = 10000
 
-    a = Attack()
+class Tester(object):
+    def __init__(self, attack):
+        self.n_trials = 10000
+        self.a = attack
+        self.plan_names = ("Main Hand Only",
+                           "Always Both",
+                           "OH on Miss")
+        self.plans = (self.a.mh_only, self.a.always_both, self.a.oh_on_mh_miss)
+        self.acs = xrange(13, 21)
 
-    def mean(nums):
+    def mean(self, nums):
         return(sum(nums)/float(len(nums)))
 
-    def generate(attack, method):
-        results = []
-        for i in xrange(n_trials):
+    def generate(self, method):
+        damages = []
+        for i in xrange(self.n_trials):
             method()
-            results.append(attack.dmg)
-        return results
+            damages.append(self.a.dmg)
+        return damages
 
-    plan_names = ("Main Hand Only",
-                  "Always Both",
-                  "OH on Miss")
-
-    plans = (a.mh_only,
-             a.always_both,
-             a.oh_on_mh_miss)
-
-    def multitest(plan_dict):
+    def multitest(self):
         results = {}
-        for name, plan in plan_dict:
-            results[name] = generate(a, plan)
+        for name, plan in zip(self.plan_names, self.plans):
+            results[name] = self.generate(plan)
         return results
 
-    def find_max(result_dict):
+    def find_max(self, result_dict):
         max_dmg = 0
         for result in result_dict.values():
             if max(result) > max_dmg:
                 max_dmg = max(result)
         return max_dmg
 
-
-    def multiresult_plot(result_dict):
+    def multiresult_plot(self, result_dict):
         n, bins, patches = pp.hist(result_dict.values(),
-                                   bins=find_max(result_dict),
+                                   bins=self.find_max(result_dict),
                                    histtype="step",
                                    label=result_dict.keys())
         pp.legend()
         pp.show()
 
-    results = multitest(zip(plan_names, plans))
-    multiresult_plot(results)
+    def ac_comparison(self):
+        all_results = {}
+        for ac in self.acs:
+            self.a.target_ac = ac
+            all_results[ac] = self.multitest()
+        return all_results
 
-    all_results = {}
-    acs = xrange(13, 21)
-    for ac in acs:
-        a.target_ac = ac
-        all_results[ac] = multitest(zip(plan_names,plans))
+    def summarize(self, results_dict):
+        mh_only_summary = []
+        both_always_summary = []
+        oh_on_miss_summary = []
+        for ac, results in results_dict.iteritems():
+            mh_only_summary.append(self.mean(results["Main Hand Only"]))
+            both_always_summary.append(self.mean(results["Always Both"]))
+            oh_on_miss_summary.append(self.mean(results["OH on Miss"]))
+        summary_pack = {}
+        for name, summary in zip(self.plan_names, (mh_only_summary, both_always_summary, oh_on_miss_summary)):
+            summary_pack[name] = summary
+        return summary_pack
 
-    mh_only_summary = []
-    both_always_summary = []
-    oh_on_miss_summary = []
-    for ac, results in all_results.iteritems():
-        mh_only_summary.append(mean(results["Main Hand Only"]))
-        both_always_summary.append(mean(results["Always Both"]))
-        oh_on_miss_summary.append(mean(results["OH on Miss"]))
+    def summary_plot(self, summary_pack):
+        pp.plot(self.acs, summary_pack["Main Hand Only"],
+                self.acs, summary_pack["OH on Miss"],
+                self.acs, summary_pack["Always Both"])
+        pp.show()
 
-    pp.plot(acs, mh_only_summary, acs, oh_on_miss_summary, acs, both_always_summary)
-    pp.show()
-    
-    both_ratio = []
-    for i,j in zip(oh_on_miss_summary, both_always_summary):
-        both_ratio.append(i/j)
+    def vector_ratio(self, num_vec, denom_vec):
+        ratio_vec = []
+        for i, j in zip(num_vec, denom_vec):
+            ratio_vec.append(i/j)
+        return ratio_vec
 
-    mh_ratio = []
-    for i,j in zip(oh_on_miss_summary, mh_only_summary):
-        mh_ratio.append(i/j)
+if __name__ == "__main__":
+    a = Attack()
+    t = Tester(a)
+    results = t.multitest()
+    t.multiresult_plot(results)
+    all_results = t.ac_comparison()
+    summary = t.summarize(all_results)
+    t.summary_plot(summary)
 
+    b = Attack()
+    b.prof = 3
+    b.sa_dice = 2
+    t2 = Tester(b)
+    t2.multiresult_plot(t2.multitest())
+    all_results = t2.ac_comparison()
+    summary = t2.summarize(all_results)
+    t.summary_plot(summary)
 
+    c = Attack()
+    c.prof = 3
+    c.abi = 4
+    c.sa_dice = 4
+    c.oh_die = 6
+    t3 = Tester(c)
+    t3.multiresult_plot(t3.multitest())
+    all_results = t3.ac_comparison()
+    t3.summary_plot(t3.summarize(all_results))
